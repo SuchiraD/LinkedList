@@ -1,6 +1,10 @@
-There are three ".c" source files. Each file implement three lists separately.
+There are three ".c" source files. Three type of lists are implemented separately in each file.
+
+Since the optimum number of sample sizes are less than 110 we have chosen the sampleSize as 110
 We assumed that N and M are not changing(since the assignment does has fixed values for N and M).
-Hence the user only have to input "mMember, mInsert, mDelete" respectively(separated by space or new line).
+
+The user only have to input "mMember, mInsert, mDelete" respectively(separated by space or new line).
+
 
 "linkedList_serial.c"
 ----------------------
