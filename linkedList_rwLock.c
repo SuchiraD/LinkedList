@@ -5,7 +5,6 @@
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
-#include <time.h>
 
 
 #define MAX_NUMBER 65536
@@ -231,26 +230,6 @@ double calculateAvg(double array_p[], int count) {
     return sum/count;
 }
 
-int calculateSTD(double time_list[], int samples, double mean){
-    int i;
-    float std=0;
-    float temp=0.0;
-    float min_samples;
-    for(i=0; i<samples; i++){
-        time_list[i] -= mean;
-        temp = time_list[i]*time_list[i];
-        std += temp;
-    }
-    std = std/samples;
-    std = sqrt(std);
-    min_samples = pow((100*1.96*std)/(5*mean),2);
-    printf("Average time spent = %f\n",mean);
-    printf("Standard Deviation = %f\n",(std));
-    //printf("Minimum samples need = %f\n", min_samples);
-
-    return 0;
-}
-
 double calculateStd(double array_p[], int count) {
     double mu = calculateAvg(array_p, count);
 
@@ -274,29 +253,25 @@ int main() {
     //Changing the PRNG seed according to the current time stamp
 
 
-    int nThreads = 4;
-    int sampleSize = 50;
+    int nThreads[] = {1, 2, 4};
+    int sampleSize = 110;
+
+    printf("***********   Parallel program with read-write lock   **********\n");
+
     N = 1000;
     M = 10000;
     float mMember = 0.99;
     float mInsert = 0.005;
     float mDelete = 0.005;
 
-
-
-    printf("Enter number of threads: ");
-//    scanf("%d", &nThreads);
-
-    printf("Enter N: ");
+    printf("N = %d\n", N);
 //    scanf("%d", &N);
 
-    printf("Enter M: ");
+    printf("M = %d\n", M);
 //    scanf("%d", &M);
 
     printf("Enter Member, Insert, Delete fractions: ");
-//    scanf("%f%f%f", &mMember, &mInsert, &mDelete);
-
-    printf("\n");
+    scanf("%f%f%f", &mMember, &mInsert, &mDelete);
 
 
 //    printf("List's Element count before: %i\n", countListElements(head));
@@ -309,55 +284,61 @@ int main() {
 
     double times[sampleSize];
 
-    for (int j = 0; j < sampleSize; j++) {
-        srand((unsigned int) time(NULL));
-        head = NULL;
+    printf("\nSample size = %d\n", sampleSize);
+    for (int nThreadIndex = 0; nThreadIndex < 3; ++nThreadIndex) {
+        for (int j = 0; j < sampleSize; j++) {
+            srand((unsigned int) time(NULL));
+            head = NULL;
 
-        int array[N];
-        randomArray = &array;
+            int array[N];
+            randomArray = &array;
 
-        populate();
+            populate();
 
-        if (pthread_rwlock_init(&lock, NULL) != 0)
-        {
-            printf("\n mutex init failed\n");
-            return 1;
-        }
+            if (pthread_rwlock_init(&lock, NULL) != 0)
+            {
+                printf("\n mutex init failed\n");
+                return 1;
+            }
 
-        clock_t start = clock();
-        int i = 0;
-        int err;
-        while(i < nThreads)
-        {
-            err = pthread_create(&(tid[i]), NULL, &run, NULL);
-            if (err != 0)
-                printf("\ncan't create thread :[%s]", strerror(err));
-            i++;
-        }
+            clock_t start = clock();
+            int i = 0;
+            int err;
+            while(i < nThreads[nThreadIndex])
+            {
+                err = pthread_create(&(tid[i]), NULL, &run, NULL);
+                if (err != 0)
+                    printf("\ncan't create thread :[%s]", strerror(err));
+                i++;
+            }
 
 //    printf("Threads created\n");
 
-        i = 0;
-        while(i < nThreads)
-        {
-            pthread_join(tid[i], NULL);
-            i++;
-        }
-        clock_t end = clock();
+            i = 0;
+            while(i < nThreads[nThreadIndex])
+            {
+                pthread_join(tid[i], NULL);
+                i++;
+            }
+            clock_t end = clock();
 
-        times[j] = ((double) (end - start)) / CLOCKS_PER_SEC;
+            times[j] = ((double) (end - start)) / CLOCKS_PER_SEC;
 
 //        printf("-----------  In Sample run  : %f\n", times[j]);
+        }
+
+        pthread_rwlock_destroy(&lock);
+
+        double std = calculateStd(times, sampleSize);
+        double mean = calculateAvg(times, sampleSize);
+
+        printf("-----------------------------------\n");
+        printf("Number of threads = %d\n", nThreads[nThreadIndex]);
+        printf("Standard deviation = %f\n", std);
+        printf("Mean = %f\n", mean);
     }
 
-    pthread_rwlock_destroy(&lock);
 
-    double std = calculateStd(times, sampleSize);
-    double mean = calculateAvg(times, sampleSize);
-
-    printf("Standard deviation = %f\n", std);
-    printf("Mean = %f\n", mean);
-    printf("Proper sample size = %d\n", properSampleSize(std,mean));
 
 //    printf("List's Element count after: %i\n", countListElements(head));
 

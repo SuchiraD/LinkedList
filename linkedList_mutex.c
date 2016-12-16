@@ -5,7 +5,6 @@
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
-#include <time.h>
 
 
 #define MAX_NUMBER 65536
@@ -230,26 +229,6 @@ double calculateAvg(double array_p[], int count) {
     return sum/count;
 }
 
-int calculateSTD(double time_list[], int samples, double mean){
-    int i;
-    float std=0;
-    float temp=0.0;
-    float min_samples;
-    for(i=0; i<samples; i++){
-        time_list[i] -= mean;
-        temp = time_list[i]*time_list[i];
-        std += temp;
-    }
-    std = std/samples;
-    std = sqrt(std);
-    min_samples = pow((100*1.96*std)/(5*mean),2);
-    printf("Average time spent = %f\n",mean);
-    printf("Standard Deviation = %f\n",(std));
-    //printf("Minimum samples need = %f\n", min_samples);
-
-    return 0;
-}
-
 double calculateStd(double array_p[], int count) {
     double mu = calculateAvg(array_p, count);
 
@@ -275,6 +254,8 @@ int main() {
     int nThreads[] = {1, 2, 4};
     int sampleSize = 110;
 
+    printf("***********   Parallel program with one mutex   **********\n");
+
     N = 1000;
     M = 10000;
     float mMember = 0.99;
@@ -289,8 +270,6 @@ int main() {
 
     printf("Enter Member, Insert, Delete fractions: ");
     scanf("%f%f%f", &mMember, &mInsert, &mDelete);
-
-    printf("\n");
 
 
 //    printf("List's Element count before: %i\n", countListElements(head));
