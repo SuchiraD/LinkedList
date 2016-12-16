@@ -2,7 +2,11 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <string.h>
+#include <pthread.h>
+#include <math.h>
 #include <time.h>
+
 
 #define MAX_NUMBER 65536
 
@@ -12,7 +16,9 @@ struct node {
 };
 
 struct node* head = NULL;
-struct node* current = NULL;
+
+pthread_t tid[5];
+pthread_rwlock_t lock;
 
 int N = 10;
 int M = 10;
@@ -22,6 +28,7 @@ int insertOpsCount = 0;
 int deleteOpsCount = 0;
 
 int member(int value, int* memberOpsCount) {
+//    pthread_mutex_lock(&lock);
     (*memberOpsCount)--;
     struct node* current_p = head;
 
@@ -30,13 +37,17 @@ int member(int value, int* memberOpsCount) {
     }
 
     if(current_p == NULL || current_p->value > value) {
+//        pthread_mutex_unlock(&lock);
         return 0;
-    } else
+    } else {
+//        pthread_mutex_unlock(&lock);
         return 1;
+    }
 }
 
 //insert
 int insert(int value, int* insertOpsCount) {
+//    pthread_mutex_lock(&lock);
     if(insertOpsCount != NULL)
         (*insertOpsCount)--;
 
@@ -61,22 +72,29 @@ int insert(int value, int* insertOpsCount) {
         temp_p->next = current_p;
         if(pred_p == NULL) {
             head = temp_p;
-        } else
+        } else {
             pred_p->next = temp_p;
+        }
 
+//        pthread_mutex_unlock(&lock);
         return 1;
-    } else
+    } else {
+//        pthread_mutex_unlock(&lock);
         return 0;
+    }
 }
 
 // Random generated values might not in the list
 int delete(int value, int* deleteOpsCount) {
+//    pthread_mutex_lock(&lock);
     (*deleteOpsCount)--;
     struct node* current_p = head;
     struct node* pred_p = NULL;
 
-    if(head == NULL)
+    if(head == NULL) {
+//       pthread_mutex_unlock(&lock);
         return 0;
+    }
 
     while (current_p != NULL && current_p->value < value) {
         pred_p = current_p;
@@ -90,9 +108,12 @@ int delete(int value, int* deleteOpsCount) {
             pred_p->next = current_p==NULL ? NULL: current_p->next;
         free(current_p);
 
+//        pthread_mutex_unlock(&lock);
         return 1;
-    } else
+    } else {
+//        pthread_mutex_unlock(&lock);
         return 0;
+    }
 }
 
 //The Knuth algorithm for random unique numbers
@@ -136,6 +157,8 @@ void populate() {
 void runAFunction(int value, int* memberOpsCount, int* insertOpsCount, int* deleteOpsCount) {
     int func;
 
+//    pthread_mutex_lock(&lock);
+
     while (true) {
         func = rand()%3;
         if(func == 0 && *memberOpsCount == 0) {
@@ -154,20 +177,36 @@ void runAFunction(int value, int* memberOpsCount, int* insertOpsCount, int* dele
     int returnVal = 0;
     switch (func) {
         case 0:
+            pthread_rwlock_rdlock(&lock);
             returnVal = member(value, memberOpsCount);
+            pthread_rwlock_unlock(&lock);
             break;
 
         case 1:
+            pthread_rwlock_wrlock(&lock);
             returnVal = insert(value, insertOpsCount);
+            pthread_rwlock_unlock(&lock);
             break;
 
         case 2:
+            pthread_rwlock_wrlock(&lock);
             returnVal = delete(value, deleteOpsCount);
+            pthread_rwlock_unlock(&lock);
             break;
     }
+
+//    pthread_mutex_unlock(&lock);
 }
 
-void run() {
+void* run(void* arg) {
+//    pthread_mutex_lock(&lock);
+    /*pthread_t id = pthread_self();
+    if(pthread_equal(id, tid[0]) == 1) {
+        printf("Thread id = 1\n");
+    } else if (pthread_equal(id, tid[1]) == 1) {
+        printf("Thread id = 2\n");
+    }
+*/
     int* moc_p = malloc(sizeof(int*));
     int* ioc_p = malloc(sizeof(int*));
     int* doc_p = malloc(sizeof(int*));
@@ -175,28 +214,78 @@ void run() {
     *ioc_p = insertOpsCount;
     *doc_p = deleteOpsCount;
 
-    clock_t start = clock();
     while (*moc_p!=0 || *ioc_p!=0 || *doc_p!=0) {
         runAFunction(abs(rand())%MAX_NUMBER, moc_p, ioc_p, doc_p);
     }
-    clock_t end = clock();
-    double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-    printf("%f\n", cpu_time_used);
+//    pthread_mutex_unlock(&lock);
+}
+
+double calculateAvg(double array_p[], int count) {
+    double sum = 0;
+    for (int i = 0; i < count; i++) {
+        sum += array_p[i];
+//        printf("-----------  In AVG  : %f\n", (*array_p)[i]);
+    }
+
+    return sum/count;
+}
+
+int calculateSTD(double time_list[], int samples, double mean){
+    int i;
+    float std=0;
+    float temp=0.0;
+    float min_samples;
+    for(i=0; i<samples; i++){
+        time_list[i] -= mean;
+        temp = time_list[i]*time_list[i];
+        std += temp;
+    }
+    std = std/samples;
+    std = sqrt(std);
+    min_samples = pow((100*1.96*std)/(5*mean),2);
+    printf("Average time spent = %f\n",mean);
+    printf("Standard Deviation = %f\n",(std));
+    //printf("Minimum samples need = %f\n", min_samples);
+
+    return 0;
+}
+
+double calculateStd(double array_p[], int count) {
+    double mu = calculateAvg(array_p, count);
+
+    double squaredSum = 0;
+    for (int i = 0; i < count; i++) {
+        double tempVal = (array_p[i] - mu);
+        squaredSum += tempVal*tempVal;
+//        printf("-----------  In STD  : %f\n", (*array_p)[i]);
+    }
+
+    return sqrt(squaredSum/(count));
+}
+
+int properSampleSize(double std, double mean) {
+    double tempVal = (100*1.960*std/(5*mean));
+
+    return (int) (tempVal*tempVal);
 }
 
 int main() {
     //Changing the PRNG seed according to the current time stamp
-    srand((unsigned int) time(NULL));
 
+
+    int nThreads = 4;
+    int sampleSize = 50;
     N = 1000;
     M = 10000;
     float mMember = 0.99;
     float mInsert = 0.005;
     float mDelete = 0.005;
 
-    int array[N];
-    randomArray = &array;
+
+
+    printf("Enter number of threads: ");
+//    scanf("%d", &nThreads);
 
     printf("Enter N: ");
 //    scanf("%d", &N);
@@ -208,17 +297,69 @@ int main() {
 //    scanf("%f%f%f", &mMember, &mInsert, &mDelete);
 
     printf("\n");
-    populate();
-    printf("List's Element count before: %i\n", countListElements(head));
+
+
+//    printf("List's Element count before: %i\n", countListElements(head));
 
     memberOpsCount = (int) (mMember*M);
     insertOpsCount = (int) (mInsert*M);
     deleteOpsCount = (int) (mDelete*M);
 
-    run();
+//    printf("Creating Threads\n");
 
-    printf("List's Element count after: %i\n", countListElements(head));
+    double times[sampleSize];
 
-    printf("FINISHED");
+    for (int j = 0; j < sampleSize; j++) {
+        srand((unsigned int) time(NULL));
+        head = NULL;
+
+        int array[N];
+        randomArray = &array;
+
+        populate();
+
+        if (pthread_rwlock_init(&lock, NULL) != 0)
+        {
+            printf("\n mutex init failed\n");
+            return 1;
+        }
+
+        clock_t start = clock();
+        int i = 0;
+        int err;
+        while(i < nThreads)
+        {
+            err = pthread_create(&(tid[i]), NULL, &run, NULL);
+            if (err != 0)
+                printf("\ncan't create thread :[%s]", strerror(err));
+            i++;
+        }
+
+//    printf("Threads created\n");
+
+        i = 0;
+        while(i < nThreads)
+        {
+            pthread_join(tid[i], NULL);
+            i++;
+        }
+        clock_t end = clock();
+
+        times[j] = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+//        printf("-----------  In Sample run  : %f\n", times[j]);
+    }
+
+    pthread_rwlock_destroy(&lock);
+
+    double std = calculateStd(times, sampleSize);
+    double mean = calculateAvg(times, sampleSize);
+
+    printf("Standard deviation = %f\n", std);
+    printf("Mean = %f\n", mean);
+    printf("Proper sample size = %d\n", properSampleSize(std,mean));
+
+//    printf("List's Element count after: %i\n", countListElements(head));
+
+    printf("FINISHED\n");
 }
-
